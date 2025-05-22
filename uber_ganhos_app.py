@@ -1,10 +1,10 @@
-# AVISO: Este script usa Streamlit e Firebase, que devem ser instalados no ambiente local ou no Streamlit Cloud.
+# AVISO: Este script usa Streamlit e Firebase, que devem estar instalados.
 # Para rodar localmente, use: pip install streamlit firebase-admin
 
 try:
     import streamlit as st
 except ModuleNotFoundError:
-    raise ImportError("Streamlit não está instalado. Use 'pip install streamlit' e execute localmente.")
+    raise ImportError("Streamlit não está instalado. Use 'pip install streamlit'.")
 
 from datetime import datetime
 import firebase_admin
@@ -24,37 +24,53 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app(cred)
         os.unlink(tmp_path)
     except KeyError:
-        raise KeyError("Chave 'firebase_cred' não encontrada nos segredos do Streamlit. Vá em '⋮ > Edit secrets' e adicione sua credencial.")
+        raise KeyError("Chave 'firebase_cred' não encontrada nos segredos do Streamlit.")
 
 db = firestore.client()
 
-st.title("📈 Acompanhamento de Ganhos - Uber")
+# Determina se é administrador
+is_admin = st.secrets.get("admin", False)
 
-# Entrada de valor
-data = st.date_input("Data da corrida", value=datetime.today())
-valor = st.number_input("Valor ganho (R$)", min_value=0.0, step=0.5, format="%.2f")
+st.title("💼 Ganhos Algarve")
 
-if st.button("Adicionar ganho"):
-    doc_ref = db.collection("ganhos").document()
-    doc_ref.set({
-        "data": data.strftime("%Y-%m-%d"),
-        "valor": valor,
-        "timestamp": firestore.SERVER_TIMESTAMP
-    })
-    st.success("Ganho registrado com sucesso!")
-
-st.subheader("📊 Histórico de Ganhos")
-
-# Recupera dados do Firestore
-ganhos_ref = db.collection("ganhos").order_by("timestamp", direction=firestore.Query.DESCENDING)
+# Obtem valor total atual
+ganhos_ref = db.collection("ganhos")
 ganhos = ganhos_ref.stream()
+total = sum([g.to_dict()["valor"] for g in ganhos])
 
-total = 0.0
+st.header(f"💰 {total:.2f} €")
 
-for g in ganhos:
-    item = g.to_dict()
-    st.write(f"📅 {item['data']} - 💰 R$ {item['valor']:.2f}")
-    total += item['valor']
+if is_admin:
+    st.markdown("### Inserir novo valor")
 
-st.markdown("---")
-st.metric(label="Total acumulado", value=f"R$ {total:.2f}")
+    # Interface tipo calculadora
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        n1 = st.button("1")
+        n4 = st.button("4")
+        n7 = st.button("7")
+    with col2:
+        n2 = st.button("2")
+        n5 = st.button("5")
+        n8 = st.button("8")
+    with col3:
+        n3 = st.button("3")
+        n6 = st.button("6")
+        n9 = st.button("9")
+
+    valor_manual = st.text_input("Valor a adicionar", "")
+
+    if st.button("➕ Somar valor") and valor_manual.strip():
+        try:
+            valor_float = float(valor_manual.replace(",", "."))
+            db.collection("ganhos").add({
+                "valor": valor_float,
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": firestore.SERVER_TIMESTAMP
+            })
+            st.success("Valor adicionado com sucesso!")
+            st.experimental_rerun()
+        except ValueError:
+            st.error("Digite um valor numérico válido.")
+else:
+    st.info("Essa visualização é somente leitura para visitantes.")
