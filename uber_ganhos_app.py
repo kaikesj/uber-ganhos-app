@@ -31,36 +31,59 @@ db = firestore.client()
 # Determina se é administrador
 is_admin = st.secrets.get("admin", False)
 
-st.title("💼 Ganhos Algarve")
+st.markdown("""
+    <h1 style='text-align: center;'>Ganhos Algarve</h1>
+""", unsafe_allow_html=True)
 
 # Obtem valor total atual
 ganhos_ref = db.collection("ganhos")
 ganhos = ganhos_ref.stream()
 total = sum([g.to_dict()["valor"] for g in ganhos])
 
-st.header(f"💰 {total:.2f} €")
+st.markdown(f"""
+    <h2 style='text-align: center; font-size: 60px; margin-bottom: 30px;'>
+        {total:.0f}
+    </h2>
+""", unsafe_allow_html=True)
 
 if is_admin:
-    st.markdown("### Inserir novo valor")
+    st.markdown("""
+        <style>
+        .keypad button {
+            width: 80px;
+            height: 80px;
+            font-size: 24px;
+            margin: 5px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Interface tipo calculadora
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+
+    # Simula botões numéricos
     col1, col2, col3 = st.columns(3)
     with col1:
-        n1 = st.button("1")
-        n4 = st.button("4")
-        n7 = st.button("7")
+        st.button("1")
+        st.button("4")
+        st.button("7")
     with col2:
-        n2 = st.button("2")
-        n5 = st.button("5")
-        n8 = st.button("8")
+        st.button("2")
+        st.button("5")
+        st.button("8")
     with col3:
-        n3 = st.button("3")
-        n6 = st.button("6")
-        n9 = st.button("9")
+        st.button("3")
+        st.button("6")
+        st.button("9")
 
-    valor_manual = st.text_input("Valor a adicionar", "")
+    col_empty, col_plus = st.columns([2, 1])
+    with col_plus:
+        st.button("+")
 
-    if st.button("➕ Somar valor") and valor_manual.strip():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    valor_manual = st.text_input("", "", label_visibility="collapsed", placeholder="Digite o valor...")
+
+    if st.button("Somar valor") and valor_manual.strip():
         try:
             valor_float = float(valor_manual.replace(",", "."))
             db.collection("ganhos").add({
@@ -73,4 +96,8 @@ if is_admin:
         except ValueError:
             st.error("Digite um valor numérico válido.")
 else:
-    st.info("Essa visualização é somente leitura para visitantes.")
+    st.markdown("""
+        <p style='text-align: center; font-size: 16px; margin-top: 20px;'>
+            Essa visualização é somente leitura para visitantes.
+        </p>
+    """, unsafe_allow_html=True)
