@@ -9,27 +9,16 @@ except ModuleNotFoundError:
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-import json
-import tempfile
-import os
 
-# Lê a chave do Firebase dos segredos do Streamlit
+# Inicializa o Firebase diretamente a partir do arquivo credenciais.json
 if not firebase_admin._apps:
-    try:
-        firebase_json = st.secrets["firebase_cred"]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-            tmp.write(firebase_json.encode("utf-8"))
-            tmp_path = tmp.name
-        cred = credentials.Certificate(tmp_path)
-        firebase_admin.initialize_app(cred)
-        os.unlink(tmp_path)
-    except KeyError:
-        raise KeyError("Chave 'firebase_cred' não encontrada nos segredos do Streamlit.")
+    cred = credentials.Certificate("credenciais.json")
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-# Determina se é administrador
-is_admin = st.secrets.get("admin", False)
+# Determina se é administrador manualmente (mude para True se necessário)
+is_admin = True  # Altere para False para modo visitante
 
 st.markdown("""
     <h1 style='text-align: center;'>Ganhos Algarve</h1>
@@ -49,52 +38,56 @@ st.markdown(f"""
 if is_admin:
     st.markdown("""
         <style>
-        .keypad button {
-            width: 80px;
-            height: 80px;
+        div[data-testid="column"] button {
+            width: 100%;
+            height: 70px;
             font-size: 24px;
-            margin: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
 
+    if "valor_str" not in st.session_state:
+        st.session_state.valor_str = ""
+
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
 
-    # Simula botões numéricos
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.button("1")
-        st.button("4")
-        st.button("7")
+        if st.button("1"): st.session_state.valor_str += "1"
+        if st.button("4"): st.session_state.valor_str += "4"
+        if st.button("7"): st.session_state.valor_str += "7"
     with col2:
-        st.button("2")
-        st.button("5")
-        st.button("8")
+        if st.button("2"): st.session_state.valor_str += "2"
+        if st.button("5"): st.session_state.valor_str += "5"
+        if st.button("8"): st.session_state.valor_str += "8"
     with col3:
-        st.button("3")
-        st.button("6")
-        st.button("9")
+        if st.button("3"): st.session_state.valor_str += "3"
+        if st.button("6"): st.session_state.valor_str += "6"
+        if st.button("9"): st.session_state.valor_str += "9"
 
-    col_empty, col_plus = st.columns([2, 1])
-    with col_plus:
-        st.button("+")
+    col0, col_clear, col_sum = st.columns([1, 1, 1])
+    with col0:
+        if st.button("0"): st.session_state.valor_str += "0"
+    with col_clear:
+        if st.button("C"): st.session_state.valor_str = ""
+    with col_sum:
+        if st.button("Somar"):
+            try:
+                valor_float = float(st.session_state.valor_str)
+                db.collection("ganhos").add({
+                    "valor": valor_float,
+                    "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": firestore.SERVER_TIMESTAMP
+                })
+                st.success("Valor adicionado com sucesso!")
+                st.session_state.valor_str = ""
+                st.experimental_rerun()
+            except ValueError:
+                st.error("Valor inválido")
 
+    st.markdown(f"<p style='text-align: center; font-size: 28px;'>{st.session_state.valor_str}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    valor_manual = st.text_input("", "", label_visibility="collapsed", placeholder="Digite o valor...")
-
-    if st.button("Somar valor") and valor_manual.strip():
-        try:
-            valor_float = float(valor_manual.replace(",", "."))
-            db.collection("ganhos").add({
-                "valor": valor_float,
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "timestamp": firestore.SERVER_TIMESTAMP
-            })
-            st.success("Valor adicionado com sucesso!")
-            st.experimental_rerun()
-        except ValueError:
-            st.error("Digite um valor numérico válido.")
 else:
     st.markdown("""
         <p style='text-align: center; font-size: 16px; margin-top: 20px;'>
